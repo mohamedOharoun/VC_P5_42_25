@@ -207,3 +207,11 @@ En conjunto, los resultados muestran que el modelo LBP + SVM es capaz de diferen
 
 <img src="./prototipo_biometrico.gif" alt="demo" width="600" />
 
+
+
+## Uso de IA
+Chatgpt 5.1 
+
+## Referencias
+- [CelebA](https://www.kaggle.com/datasets/jessicali9530/celeba-dataset): 200.000+ imágenes de celebridades. 
+- [Beard or No Beard](https://www.kaggle.com/datasets/uzair01/beard-or-no-beard): Pocas pero bien filtradas imágenes de personas con y sin barba.
