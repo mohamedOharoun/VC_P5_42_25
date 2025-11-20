@@ -209,7 +209,7 @@ En conjunto, los resultados muestran que el modelo LBP + SVM es capaz de diferen
 
 #### GIF demostración
 
-<img src="./prototipo_biometrico.gif" alt="demo" width="600" />
+<img src="./results//prototipo_biometrico.gif" alt="demo" width="600" />
 
 
 
