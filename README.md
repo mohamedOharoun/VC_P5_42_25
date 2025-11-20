@@ -203,6 +203,10 @@ En conjunto, los resultados muestran que el modelo LBP + SVM es capaz de diferen
 | HOG + SVM  | ≈ 0.69         | ≈ 0.66         |
 | LBP + SVM  | ≈ 0.77         | ≈ 0.74         |
 
+#### Matrices de confusión
+
+<img src="./matrices_confusion_entrenamiento.png" alt="matrices" width="1200" />
+
 #### GIF demostración
 
 <img src="./prototipo_biometrico.gif" alt="demo" width="600" />
