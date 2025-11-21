@@ -205,12 +205,194 @@ En conjunto, los resultados muestran que el modelo LBP + SVM es capaz de diferen
 
 #### GIF demostración
 
-<img src="./prototipo_biometrico.gif" alt="demo" width="600" />
+<img src="./results/prototipo_biometrico.gif" alt="demo" width="600" />
 
+# Tarea II: Aplicación de Filtros en Tiempo Real
 
+Este notebook (`VC_P5_B_filtro.ipynb`) representa el producto final de la práctica. Aquí unimos el **clasificador biométrico** (entrenado en la Tarea I) con técnicas de **Realidad Aumentada** para aplicar filtros tipo *Snapchat* (Super Saiyan o Kawaii) dependiendo de si el usuario tiene barba o no.
+
+A continuación, se detalla la implementación paso a paso.
+
+## 1. Carga de Librerías, Modelos y Configuración Inicial
+
+En este bloque inicializamos el entorno. Es fundamental cargar no solo las librerías de visión (`cv2`, `dlib`), sino también el **Scaler** (`scaler_lbp`) junto con el **SVM**. 
+
+> **Nota Didáctica:** Si no cargamos el scaler utilizado durante el entrenamiento, los descriptores LBP que calculemos sobre la imagen de la webcam tendrán una escala diferente a la que espera el SVM, resultando en predicciones erróneas.
+
+```python
+import cv2
+import numpy as np
+import joblib
+import dlib
+from skimage import feature
+
+# Carga de modelos
+SVM_PATH = "models/svm_lbp_barba.joblib"
+SCALER_PATH = "models/scaler_lbp_barba.joblib"
+
+try:
+    svm_lbp = joblib.load(SVM_PATH)
+    scaler_lbp = joblib.load(SCALER_PATH)
+except FileNotFoundError:
+    print(f"No se encuentran los modelos en {SVM_PATH} o {SCALER_PATH}")
+    exit()
+
+# Dimensiones esperadas por el modelo (deben coincidir con el entrenamiento)
+WIDTH, HEIGHT = 192, 192
+CLASS_LABELS = ["con_barba", "sin_barba"]
+```
+
+## 2. Configuración del Detector Facial Geométrico
+
+Para realizar realidad aumentada creíble, no basta con un recuadro (bounding box); necesitamos saber exactamente dónde están los ojos, la nariz y la barbilla. Para ello utilizamos **Dlib**.
+
+* **Detector:** Localiza la cara en la imagen.
+* **Predictor:** Localiza 68 puntos clave (*landmarks*) dentro de esa cara.
+
+```python
+# Configuración de dlib
+detector_dlib = dlib.get_frontal_face_detector()
+LANDMARKS_PATH = "shape_predictor_68_face_landmarks.dat"
+try:
+    predictor_dlib = dlib.shape_predictor(LANDMARKS_PATH)
+except RuntimeError:
+    print(f"[ERROR] Falta '{LANDMARKS_PATH}'.")
+    exit()
+```
+
+## 3. Funciones de Soporte (Resumen)
+
+Antes del bloque principal, se definen varias funciones auxiliares encargadas del procesamiento matemático y de imagen:
+
+1.  **`lbphist` y `preprocess_lbp_from_gray`**: Son **idénticas** a las usadas en el entrenamiento. Se encargan de redimensionar el recorte de la cara a 192x192, calcular el histograma de patrones binarios locales (textura) y normalizar los datos con el scaler.
+2.  **`overlay_image_alpha`**: Esta función es el motor gráfico. Permite superponer imágenes PNG (como el pelo o los ojos) sobre el video de la webcam respetando el **canal Alpha** (transparencia). Calcula las intersecciones para evitar errores si el filtro se sale de la pantalla.
+3.  **`get_largest_face_dlib`**: Encapsula la lógica de Dlib. Convierte el frame a escala de grises, detecta las caras y, si hay varias, selecciona la más grande (la más cercana a la cámara) para devolver su rectángulo y sus 68 puntos clave.
+
+## 4. Bucle Principal: Lógica de Realidad Aumentada
+
+La función `main()` orquesta todo el proceso. A continuación, desglosamos su lógica interna en tres fases críticas: **Preparación**, **Predicción Biométrica** y **Renderizado de Filtros**.
+
+### Fase A: Carga de Assets y Bucle de Video
+Cargamos las imágenes de los filtros asegurándonos de leer el canal de transparencia (flag `-1`).
+
+```python
+def main():
+    img_saiyan = cv2.imread("filter_assets/super_saiyan_hair.png", -1)
+    img_kawaii_hair = cv2.imread("filter_assets/anime_girl_hair.png", -1)
+    img_kawaii_eyes = cv2.imread("filter_assets/anime_girl_eyes.png", -1)
+
+    cap = cv2.VideoCapture(0)
+    print("Iniciando Filtro Final. Pulsa ESC para salir.")
+
+    while True:
+        ret, frame = cap.read()
+        if not ret: break
+
+        # Obtenemos cara y landmarks
+        (rect, shape) = get_largest_face_dlib(frame)[0:2]
+```
+
+### Fase B: Predicción Biométrica (Barba vs No Barba)
+Si se detecta una cara, extraemos la Región de Interés (ROI). Aplicamos un margen (`offset`) del 10% para capturar algo de contexto (cuello/fondo), igual que hicimos al corregir el entrenamiento.
+
+```python
+        if rect is not None and shape is not None:
+            x, y, w, h = rect
+            
+            # --- PREDICCIÓN ---
+            # Expandimos el recorte un 10% para dar contexto al modelo
+            offset = int(w * 0.1)
+            y1, y2 = max(0, y - offset), min(frame.shape[0], y + h + offset)
+            x1, x2 = max(0, x - offset), min(frame.shape[1], x + w + offset)
+            face_roi = frame[y1:y2, x1:x2]
+
+            label = "sin_barba" # Valor por defecto
+            if face_roi.size > 0:
+                try:
+                    # Preprocesado LBP + SVM
+                    gray_roi = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                    desc = preprocess_lbp_from_gray(gray_roi)
+                    pred_idx = int(svm_lbp.predict(desc)[0])
+                    label = CLASS_LABELS[pred_idx]
+                except: pass
+```
+
+### Fase C: Geometría Facial y Renderizado
+Aquí es donde usamos los **Landmarks** para calcular coordenadas dinámicas.
+* **`shape[27]` (Puente nasal):** Se usa como eje central para equilibrar gafas o pelo.
+* **`shape[16] - shape[0]` (Mandíbula):** Nos da el ancho real de la cara en píxeles, permitiendo escalar los filtros (hacerlos más grandes si te acercas a la cámara).
+* **`shape[19]` y `shape[24]` (Cejas):** Determinan la altura donde debe "asentarse" el pelo.
+
+```python
+            # Referencias geométricas clave
+            bridge_nose = shape[27] 
+            face_width_pts = np.linalg.norm(shape[16] - shape[0]) 
+            eyebrow_level = min(shape[19][1], shape[24][1])
+            
+            text_to_show = ""
+            text_color = (255, 255, 255)
+
+            if label == "con_barba":
+                # --- MODO SAIYAN ---
+                text_to_show = "SUPER SAIYAN MODE"
+                text_color = (0, 255, 255) # Amarillo Cian
+
+                # Escalado dinámico: El pelo es el doble de ancho que la cara
+                hair_w = int(face_width_pts * 2.0)
+                hair_h = int(hair_w * 0.9)
+                
+                # Posicionamiento: Centrado en nariz, flotando sobre las cejas
+                hair_x = bridge_nose[0] - (hair_w // 2)
+                hair_y = eyebrow_level - int(hair_h * 0.90) 
+
+                overlay_image_alpha(frame, img_saiyan, hair_x, hair_y, hair_w, hair_h)
+            
+            else:
+                # --- MODO KAWAII ---
+                text_to_show = "KAWAII MODE"
+                text_color = (255, 180, 255) # Rosa Pastel
+
+                # 1. Pelo Anime
+                hair_w = int(face_width_pts * 1.6)
+                hair_h = int(hair_w * 1.3)
+                hair_x = bridge_nose[0] - (hair_w // 2)
+                hair_y = eyebrow_level - int(hair_h * 0.25) # Ajuste más bajo para flequillo
+                
+                overlay_image_alpha(frame, img_kawaii_hair, hair_x, hair_y, hair_w, hair_h)
+
+                # 2. Ojos Anime (Solo si la imagen cargó correctamente)
+                if img_kawaii_eyes is not None:
+                    # Calculamos distancia entre ojos reales (Puntos 36 a 45)
+                    eyes_span_width = np.linalg.norm(shape[45] - shape[36]) 
+                    
+                    # Escalamos los ojos anime un 30% más grandes que los reales
+                    overlay_eyes_w = int(eyes_span_width * 1.3)
+                    overlay_eyes_h = int(overlay_eyes_w * 0.4)
+
+                    # Centramos sobre el puente de la nariz
+                    eyes_x = bridge_nose[0] - (overlay_eyes_w // 2)
+                    eyes_y = bridge_nose[1] - (overlay_eyes_h // 2)
+
+                    overlay_image_alpha(frame, img_kawaii_eyes, eyes_x, eyes_y, overlay_eyes_w, overlay_eyes_h)
+
+            # Dibujado de interfaz (Rectángulo y Texto)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), text_color, 2)
+            cv2.putText(frame, text_to_show, (x, y + h + 40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2, cv2.LINE_AA)
+
+        cv2.imshow("Filtro VC Final", frame)
+        if cv2.waitKey(1) & 0xFF == 27: break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+```
 
 ## Uso de IA
 Chatgpt 5.1 
+Google Gemini Pro
 
 ## Referencias
 - [CelebA](https://www.kaggle.com/datasets/jessicali9530/celeba-dataset): 200.000+ imágenes de celebridades. 
