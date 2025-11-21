@@ -203,13 +203,17 @@ En conjunto, los resultados muestran que el modelo LBP + SVM es capaz de diferen
 | HOG + SVM  | ≈ 0.69         | ≈ 0.66         |
 | LBP + SVM  | ≈ 0.77         | ≈ 0.74         |
 
+#### Matrices de confusión
+
+<img src="./results/matrices_confusion_entrenamiento.png" alt="matrices" width="1200" />
+
 #### GIF demostración
 
 <img src="./results/prototipo_biometrico.gif" alt="demo" width="600" />
 
 # Tarea II: Aplicación de Filtros en Tiempo Real
 
-Este notebook (`VC_P5_B_filtro.ipynb`) representa el producto final de la práctica. Aquí unimos el **clasificador biométrico** (entrenado en la Tarea I) con técnicas de **Realidad Aumentada** para aplicar filtros tipo *Snapchat* (Super Saiyan o Kawaii) dependiendo de si el usuario tiene barba o no.
+Este notebook (`VC_P5_B_filtro.ipynb`) representa el producto final de la práctica. Aquí unimos el **clasificador biométrico** (entrenado en la Tarea I) con técnicas de **Realidad Aumentada** para aplicar filtros tipo *Instagram* (Super Saiyan o Kawaii) dependiendo de si el usuario tiene barba o no.
 
 A continuación, se detalla la implementación paso a paso.
 
@@ -217,7 +221,7 @@ A continuación, se detalla la implementación paso a paso.
 
 En este bloque inicializamos el entorno. Es fundamental cargar no solo las librerías de visión (`cv2`, `dlib`), sino también el **Scaler** (`scaler_lbp`) junto con el **SVM**. 
 
-> **Nota Didáctica:** Si no cargamos el scaler utilizado durante el entrenamiento, los descriptores LBP que calculemos sobre la imagen de la webcam tendrán una escala diferente a la que espera el SVM, resultando en predicciones erróneas.
+> **Nota:** Si no cargamos el scaler utilizado durante el entrenamiento, los descriptores LBP que calculemos sobre la imagen de la webcam tendrán una escala diferente a la que espera el SVM, resultando en predicciones erróneas.
 
 ```python
 import cv2
