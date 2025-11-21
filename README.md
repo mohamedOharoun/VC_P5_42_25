@@ -394,9 +394,14 @@ if __name__ == "__main__":
     main()
 ```
 
+## Resultado del empleo del filtro
+Se puede notar que intentar engañar al filtro para que no tenga barba se vuelve complicado. Asimismo, si me tapase la nariz ya no podría detectar una cara tan fácilmente, imposibilitando la aplicación del filtro.
+
+![Aplicación del filtro](./results/uso_filtro.gif)
+
 ## Uso de IA
-Chatgpt 5.1 
-Google Gemini Pro
+- Chatgpt 5.1 
+- Google Gemini Pro
 
 ## Referencias
 - [CelebA](https://www.kaggle.com/datasets/jessicali9530/celeba-dataset): 200.000+ imágenes de celebridades. 
